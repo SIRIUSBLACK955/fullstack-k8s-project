@@ -1,0 +1,286 @@
+name: Full Stack Docker ECR Kubernetes Deployment
+
+on:
+#   push:
+#     branches:
+#       - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ap-south-1
+
+  ECR_BACKEND_REPOSITORY: bookstore-backend
+  ECR_FRONTEND_REPOSITORY: bookstore-frontend
+
+  EKS_CLUSTER_NAME: YOUR-EKS-CLUSTER-NAME
+
+jobs:
+
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+
+    outputs:
+      image_tag: ${{ steps.image-tag.outputs.tag }}
+
+    steps:
+
+      # --------------------------------
+      # 1. Checkout source code
+      # --------------------------------
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # --------------------------------
+      # 2. Configure AWS using OIDC
+      # --------------------------------
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+
+      # --------------------------------
+      # 3. Get AWS Account ID
+      # --------------------------------
+
+      - name: Get AWS Account ID
+        id: aws-account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity \
+            --query Account \
+            --output text)
+
+          echo "ACCOUNT_ID=$ACCOUNT_ID" >> $GITHUB_ENV
+
+
+      # --------------------------------
+      # 4. Generate Docker image tag
+      # --------------------------------
+
+      - name: Generate image tag
+        id: image-tag
+        run: |
+          TAG=${GITHUB_SHA::7}
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          echo "Docker image tag: $TAG"
+
+
+      # --------------------------------
+      # 5. Login to Amazon ECR
+      # --------------------------------
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+
+      # --------------------------------
+      # 6. Build Backend Docker image
+      # --------------------------------
+
+      - name: Build backend image
+        run: |
+          docker build \
+            -t $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_BACKEND_REPOSITORY:${{ steps.image-tag.outputs.tag }} \
+            ./backend
+
+
+      # --------------------------------
+      # 7. Build Frontend Docker image
+      # --------------------------------
+
+      - name: Build frontend image
+        run: |
+          docker build \
+            -t $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_FRONTEND_REPOSITORY:${{ steps.image-tag.outputs.tag }} \
+            ./frontend
+
+
+      # --------------------------------
+      # 8. Push Backend image to ECR
+      # --------------------------------
+
+      - name: Push backend image
+        run: |
+          docker push \
+            $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_BACKEND_REPOSITORY:${{ steps.image-tag.outputs.tag }}
+
+
+      # --------------------------------
+      # 9. Push Frontend image to ECR
+      # --------------------------------
+
+      - name: Push frontend image
+        run: |
+          docker push \
+            $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_FRONTEND_REPOSITORY:${{ steps.image-tag.outputs.tag }}
+
+
+      # --------------------------------
+      # 10. Show pushed images
+      # --------------------------------
+
+      - name: Display image information
+        run: |
+          echo "Backend image:"
+          echo "$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_BACKEND_REPOSITORY:${{ steps.image-tag.outputs.tag }}"
+
+          echo ""
+
+          echo "Frontend image:"
+          echo "$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_FRONTEND_REPOSITORY:${{ steps.image-tag.outputs.tag }}"
+
+
+  # ==========================================================
+  # Kubernetes Deployment
+  # ==========================================================
+
+  deploy:
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+
+    needs:
+      - build-and-push
+
+    steps:
+
+      # --------------------------------
+      # 1. Checkout repository
+      # --------------------------------
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # --------------------------------
+      # 2. Configure AWS
+      # --------------------------------
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+
+      # --------------------------------
+      # 3. Get AWS Account ID
+      # --------------------------------
+
+      - name: Get AWS Account ID
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity \
+            --query Account \
+            --output text)
+
+          echo "ACCOUNT_ID=$ACCOUNT_ID" >> $GITHUB_ENV
+
+
+      # --------------------------------
+      # 4. Configure kubectl for EKS
+      # --------------------------------
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig \
+            --region $AWS_REGION \
+            --name $EKS_CLUSTER_NAME
+
+
+      # --------------------------------
+      # 5. Update backend image
+      # --------------------------------
+
+      - name: Update backend image
+        run: |
+          kubectl set image deployment/backend-deployment \
+            backend=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_BACKEND_REPOSITORY:${{ needs.build-and-push.outputs.image_tag }}
+
+
+      # --------------------------------
+      # 6. Update frontend image
+      # --------------------------------
+
+      - name: Update frontend image
+        run: |
+          kubectl set image deployment/frontend-deployment \
+            frontend=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_FRONTEND_REPOSITORY:${{ needs.build-and-push.outputs.image_tag }}
+
+
+      # --------------------------------
+      # 7. Wait for backend deployment
+      # --------------------------------
+
+      - name: Wait for backend rollout
+        run: |
+          kubectl rollout status \
+            deployment/backend-deployment \
+            --timeout=180s
+
+
+      # --------------------------------
+      # 8. Wait for frontend deployment
+      # --------------------------------
+
+      - name: Wait for frontend rollout
+        run: |
+          kubectl rollout status \
+            deployment/frontend-deployment \
+            --timeout=180s
+
+
+      # --------------------------------
+      # 9. Check pods
+      # --------------------------------
+
+      - name: Check Kubernetes pods
+        run: |
+          kubectl get pods -o wide
+
+
+      # --------------------------------
+      # 10. Check services
+      # --------------------------------
+
+      - name: Check Kubernetes services
+        run: |
+          kubectl get services
+
+
+      # --------------------------------
+      # 11. Deployment summary
+      # --------------------------------
+
+      - name: Deployment summary
+        run: |
+          echo "========================================="
+          echo "Deployment completed successfully"
+          echo "========================================="
+
+          echo ""
+          echo "Backend image:"
+          echo "$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_BACKEND_REPOSITORY:${{ needs.build-and-push.outputs.image_tag }}"
+
+          echo ""
+          echo "Frontend image:"
+          echo "$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_FRONTEND_REPOSITORY:${{ needs.build-and-push.outputs.image_tag }}"
+
+          echo ""
+          echo "Kubernetes pods:"
+          kubectl get pods
+
+          echo ""
+          echo "Kubernetes services:"
+          kubectl get svc
