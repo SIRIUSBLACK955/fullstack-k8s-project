@@ -17,7 +17,7 @@ env:
   ECR_BACKEND_REPOSITORY: bookstore-backend
   ECR_FRONTEND_REPOSITORY: bookstore-frontend
 
-  EKS_CLUSTER_NAME: YOUR-EKS-CLUSTER-NAME
+  EKS_CLUSTER_NAME: test
 
 jobs:
 
