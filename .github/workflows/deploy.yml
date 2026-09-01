@@ -247,13 +247,18 @@ jobs:
       
       - name: Create SSH key 
         run: | 
-            echo "${{ secrets.EC2_SECRET_KEY }}" > ec2-key.pem 
-            chmod 400 ec2-key.pem
+            cat > /tmp/ec2-key.pem <<'EOF'
+            ${{ secrets.EC2_SECRET_KEY }}
+            EOF
+
+            chmod 600 /tmp/ec2-key.pem
+
+            echo "SSH key created"
 
       - name: deploy pods
         run: |
             ssh -o StrictHostKeyChecking=no \
-            -i ec2-key.pem\
+            -i /tmp/ec2-key.pem \
             ec2-user@3.80.124.7 <<'EOF'
 
             set -e
