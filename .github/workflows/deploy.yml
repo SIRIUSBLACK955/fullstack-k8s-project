@@ -168,82 +168,101 @@ jobs:
       # 2. Configure AWS
       # --------------------------------
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+    #   - name: Configure AWS credentials
+    #     uses: aws-actions/configure-aws-credentials@v4
+    #     with:
+    #       role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+    #       aws-region: ${{ env.AWS_REGION }}
 
 
       # --------------------------------
       # 3. Get AWS Account ID
       # --------------------------------
 
-      - name: Get AWS Account ID
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity \
-            --query Account \
-            --output text)
+    #   - name: Get AWS Account ID
+    #     run: |
+    #       ACCOUNT_ID=$(aws sts get-caller-identity \
+    #         --query Account \
+    #         --output text)
 
-          echo "ACCOUNT_ID=$ACCOUNT_ID" >> $GITHUB_ENV
+    #       echo "ACCOUNT_ID=$ACCOUNT_ID" >> $GITHUB_ENV
 
 
       # --------------------------------
       # 4. Configure kubectl for EKS
       # --------------------------------
 
-      - name: Configure kubectl
-        run: |
-          aws eks update-kubeconfig \
-            --region $AWS_REGION \
-            --name $EKS_CLUSTER_NAME
+    #   - name: Configure kubectl
+    #     run: |
+    #       aws eks update-kubeconfig \
+    #         --region $AWS_REGION \
+    #         --name $EKS_CLUSTER_NAME
 
 
       # --------------------------------
       # 5. Update backend image
       # --------------------------------
 
-      - name: Update backend image
-        run: |
-          kubectl set image deployment/backend-deployment \
-            backend=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_BACKEND_REPOSITORY:${{ needs.build-and-push.outputs.image_tag }}
+    #   - name: Update backend image
+    #     run: |
+    #       kubectl set image deployment/backend-deployment \
+    #         backend=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_BACKEND_REPOSITORY:${{ needs.build-and-push.outputs.image_tag }}
 
 
       # --------------------------------
       # 6. Update frontend image
       # --------------------------------
 
-      - name: Update frontend image
-        run: |
-          kubectl set image deployment/frontend-deployment \
-            frontend=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_FRONTEND_REPOSITORY:${{ needs.build-and-push.outputs.image_tag }}
+    #   - name: Update frontend image
+    #     run: |
+    #       kubectl set image deployment/frontend-deployment \
+    #         frontend=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_FRONTEND_REPOSITORY:${{ needs.build-and-push.outputs.image_tag }}
 
 
       # --------------------------------
       # 7. Wait for backend deployment
       # --------------------------------
 
-      - name: Wait for backend rollout
-        run: |
-          kubectl rollout status \
-            deployment/backend-deployment \
-            --timeout=180s
+    #   - name: Wait for backend rollout
+    #     run: |
+    #       kubectl rollout status \
+    #         deployment/backend-deployment \
+    #         --timeout=180s
 
 
       # --------------------------------
       # 8. Wait for frontend deployment
       # --------------------------------
 
-      - name: Wait for frontend rollout
-        run: |
-          kubectl rollout status \
-            deployment/frontend-deployment \
-            --timeout=180s
+    #   - name: Wait for frontend rollout
+    #     run: |
+    #       kubectl rollout status \
+    #         deployment/frontend-deployment \
+    #         --timeout=180s
 
 
       # --------------------------------
       # 9. Check pods
       # --------------------------------
+
+      - name: deploy pods
+        run: |
+            ssh -o StrictHostKeyChecking=no \
+            -i ${{ secrets.EC2_SECRET_KEY }} \
+            ec2-user@3.80.124.7 <<'EOF'
+
+            set -e
+            sudo yum install git -y
+            git clone https://github.com/SIRIUSBLACK955/fullstack-k8s-project.git
+            cd fullstack-k8s-project
+            git pull
+            aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+            cd k8s
+            kubectl apply -f backend-deployment.yaml
+            kubectl apply -f frontend-deployment.yaml
+            kubectl apply -f backend-service.yaml
+            kubectl apply -f frontend-service.yaml
+            EOF
 
       - name: Check Kubernetes pods
         run: |
