@@ -263,9 +263,13 @@ jobs:
 
             set -e
             sudo yum install git -y
-            git clone https://github.com/SIRIUSBLACK955/fullstack-k8s-project.git
-            cd fullstack-k8s-project
-            git pull
+            if [ -d "fullstack-k8s-project/.git" ]; then
+                cd fullstack-k8s-project
+                git pull
+            else
+                git clone https://github.com/SIRIUSBLACK955/fullstack-k8s-project.git
+                cd fullstack-k8s-project
+            fi
             aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
             cd k8s
             kubectl apply -f backend-deployment.yaml
