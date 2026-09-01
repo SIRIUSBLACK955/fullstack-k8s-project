@@ -244,11 +244,16 @@ jobs:
       # --------------------------------
       # 9. Check pods
       # --------------------------------
+      
+      - name: Create SSH key 
+        run: | 
+            echo "${{ secrets.EC2_SECRET_KEY }}" > ec2-key.pem 
+            chmod 400 ec2-key.pem
 
       - name: deploy pods
         run: |
             ssh -o StrictHostKeyChecking=no \
-            -i ${{ secrets.EC2_SECRET_KEY }} \
+            -i ec2-key.pem\
             ec2-user@3.80.124.7 <<'EOF'
 
             set -e
