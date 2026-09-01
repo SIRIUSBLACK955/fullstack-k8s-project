@@ -278,6 +278,13 @@ jobs:
             kubectl apply -f frontend-service.yaml
             EOF
 
+      - name: Configure EKS
+        run: |
+            aws eks update-kubeconfig \
+            --region us-east-1 \
+            --name test
+
+
       - name: Check Kubernetes pods
         run: |
           kubectl get pods -o wide
