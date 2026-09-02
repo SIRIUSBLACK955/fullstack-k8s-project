@@ -69,46 +69,12 @@ jobs:
             --name $EKS_CLUSTER_NAME
 
 
-      # --------------------------------
-      # 5. Update backend image
-      # --------------------------------
-
-      - name: Update backend image
+      - name: Deploy backend and frontend
         run: |
-          kubectl set image deployment/backend-deployment \
-            backend=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_BACKEND_REPOSITORY:${{ needs.build-and-push.outputs.image_tag }}
-
-
-      # --------------------------------
-      # 6. Update frontend image
-      # --------------------------------
-
-      - name: Update frontend image
-        run: |
-          kubectl set image deployment/frontend-deployment \
-            frontend=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_FRONTEND_REPOSITORY:${{ needs.build-and-push.outputs.image_tag }}
-
-
-      # --------------------------------
-      # 7. Wait for backend deployment
-      # --------------------------------
-
-      - name: Wait for backend rollout
-        run: |
-          kubectl rollout status \
-            deployment/backend-deployment \
-            --timeout=180s
-
-
-      # --------------------------------
-      # 8. Wait for frontend deployment
-      # --------------------------------
-
-      - name: Wait for frontend rollout
-        run: |
-          kubectl rollout status \
-            deployment/frontend-deployment \
-            --timeout=180s
+          kubectl apply -f k8s/backend-deployment.yaml
+          kubectl apply -f k8s/frontend-deployment.yaml
+          kubectl apply -f k8s/backend-service.yaml
+          kubectl apply -f k8s/frontend-service.yaml
 
 
       # --------------------------------

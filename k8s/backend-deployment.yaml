@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: 767397985067.dkr.ecr.us-east-1.amazonaws.com/bookstore-backend
+          image: 058264395605.dkr.ecr.us-east-1.amazonaws.com/bookstore-backend
 
           ports:
             - containerPort: 5000
