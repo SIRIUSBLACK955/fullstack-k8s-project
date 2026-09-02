@@ -93,7 +93,7 @@ jobs:
       - name: Build backend image
         run: |
           docker build \
-            -t $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_BACKEND_REPOSITORY:${{ steps.image-tag.outputs.tag }} \
+            -t $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_BACKEND_REPOSITORY:latest \
             ./backend
 
 
@@ -104,7 +104,7 @@ jobs:
       - name: Build frontend image
         run: |
           docker build \
-            -t $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_FRONTEND_REPOSITORY:${{ steps.image-tag.outputs.tag }} \
+            -t $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_FRONTEND_REPOSITORY:latest \
             ./frontend
 
 
@@ -115,7 +115,7 @@ jobs:
       - name: Push backend image
         run: |
           docker push \
-            $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_BACKEND_REPOSITORY:${{ steps.image-tag.outputs.tag }}
+            $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_BACKEND_REPOSITORY:latest
 
 
       # --------------------------------
@@ -125,7 +125,7 @@ jobs:
       - name: Push frontend image
         run: |
           docker push \
-            $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_FRONTEND_REPOSITORY:${{ steps.image-tag.outputs.tag }}
+            $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_FRONTEND_REPOSITORY:latest
 
 
       # --------------------------------
